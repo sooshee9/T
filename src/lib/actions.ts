@@ -2,14 +2,14 @@
 'use server';
 
 import { db } from '../../src/lib/firebase';
-import { doc, deleteDoc, collection, addDoc, updateDoc } from 'firebase/firestore';
+import { doc, deleteDoc, collection, addDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { z } from 'zod';
 import { Complaint } from '../types/complaint';
 import { PRIORITY_LEVELS, COMPLAINT_STATUSES } from './constants';
 
 const ComplaintSchema = z.object({
   complaintId: z.string(),
-  complaintDate: z.string(),
+  complaintDate: z.union([z.string(), z.instanceof(Timestamp)]),
   machineName: z.string().min(1, 'Machine name is required'),
   complaintDescription: z.string().min(1, 'Description is required'),
   priority: z.enum(PRIORITY_LEVELS),
@@ -42,6 +42,10 @@ export async function createComplaintAction(data: ComplaintInput) {
   console.log('[createComplaintAction] createdBy:', data.createdBy);
   try {
     const validatedData = ComplaintSchema.parse(data);
+    // Convert complaintDate to Firestore Timestamp if it's a string
+    if (typeof validatedData.complaintDate === 'string') {
+      validatedData.complaintDate = Timestamp.fromDate(new Date(validatedData.complaintDate));
+    }
     console.log('[createComplaintAction] Data validated, about to call addDoc...');
     const docRef = await addDoc(collection(db, 'complaints'), validatedData);
     console.log('[createComplaintAction] Firestore write successful! New doc id:', docRef.id);
